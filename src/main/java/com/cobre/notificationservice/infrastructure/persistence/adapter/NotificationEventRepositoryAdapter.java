@@ -46,6 +46,13 @@ public class NotificationEventRepositoryAdapter implements NotificationEventRepo
         return repository.findById(notificationEventId.value()).map(this::toDomain);
     }
 
+    @Override
+    public List<NotificationEvent> findDueForDelivery(Instant now) {
+        return repository.findDueForDelivery(now).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
     private NotificationEventEntity toEntity(NotificationEvent notificationEvent) {
         NotificationEventEntity entity = new NotificationEventEntity();
         entity.setNotificationEventId(notificationEvent.notificationEventId().value());
@@ -58,6 +65,7 @@ public class NotificationEventRepositoryAdapter implements NotificationEventRepo
         entity.setAttemptCount(notificationEvent.attemptCount());
         entity.setLastAttemptAt(notificationEvent.lastAttemptAt());
         entity.setDeliveredAt(notificationEvent.deliveredAt());
+        entity.setNextRetryAt(notificationEvent.nextRetryAt());
         entity.setHttpStatus(notificationEvent.httpStatus());
         entity.setFinalFailureReason(notificationEvent.finalFailureReason());
         entity.setCreatedAt(notificationEvent.createdAt());
@@ -80,8 +88,8 @@ public class NotificationEventRepositoryAdapter implements NotificationEventRepo
                 entity.getAttemptCount(),
                 entity.getLastAttemptAt(),
                 entity.getDeliveredAt(),
+                entity.getNextRetryAt(),
                 entity.getHttpStatus(),
                 entity.getFinalFailureReason());
     }
 }
-

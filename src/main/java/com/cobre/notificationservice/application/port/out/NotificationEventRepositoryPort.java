@@ -19,5 +19,6 @@ public interface NotificationEventRepositoryPort {
             DeliveryStatus deliveryStatus);
 
     Optional<NotificationEvent> findById(NotificationEventId notificationEventId);
-}
 
+    List<NotificationEvent> findDueForDelivery(Instant now);
+}

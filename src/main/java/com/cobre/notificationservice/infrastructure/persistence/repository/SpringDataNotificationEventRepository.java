@@ -24,5 +24,14 @@ public interface SpringDataNotificationEventRepository extends JpaRepository<Not
             @Param("fromDate") Instant fromDate,
             @Param("toDate") Instant toDate,
             @Param("status") DeliveryStatus status);
-}
 
+    @Query("""
+        select ne
+        from NotificationEventEntity ne
+        where ne.deliveryStatus = com.cobre.notificationservice.domain.model.value.DeliveryStatus.PENDING
+           or (ne.deliveryStatus = com.cobre.notificationservice.domain.model.value.DeliveryStatus.FAILED_RETRYABLE
+               and ne.nextRetryAt <= :now)
+        order by ne.eventCreatedAt asc
+        """)
+    List<NotificationEventEntity> findDueForDelivery(@Param("now") Instant now);
+}

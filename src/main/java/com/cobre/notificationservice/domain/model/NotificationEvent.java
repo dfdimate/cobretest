@@ -20,6 +20,7 @@ public class NotificationEvent {
     private int attemptCount;
     private Instant lastAttemptAt;
     private Instant deliveredAt;
+    private Instant nextRetryAt;
     private Integer httpStatus;
     private String finalFailureReason;
 
@@ -35,6 +36,7 @@ public class NotificationEvent {
             int attemptCount,
             Instant lastAttemptAt,
             Instant deliveredAt,
+            Instant nextRetryAt,
             Integer httpStatus,
             String finalFailureReason) {
         this.notificationEventId = notificationEventId;
@@ -48,6 +50,7 @@ public class NotificationEvent {
         this.attemptCount = attemptCount;
         this.lastAttemptAt = lastAttemptAt;
         this.deliveredAt = deliveredAt;
+        this.nextRetryAt = nextRetryAt;
         this.httpStatus = httpStatus;
         this.finalFailureReason = finalFailureReason;
     }
@@ -73,6 +76,7 @@ public class NotificationEvent {
                 null,
                 null,
                 null,
+                null,
                 null);
     }
 
@@ -88,6 +92,7 @@ public class NotificationEvent {
             int attemptCount,
             Instant lastAttemptAt,
             Instant deliveredAt,
+            Instant nextRetryAt,
             Integer httpStatus,
             String finalFailureReason) {
         return new NotificationEvent(
@@ -102,6 +107,7 @@ public class NotificationEvent {
                 attemptCount,
                 lastAttemptAt,
                 deliveredAt,
+                nextRetryAt,
                 httpStatus,
                 finalFailureReason);
     }
@@ -130,6 +136,7 @@ public class NotificationEvent {
                 attemptCount,
                 lastAttemptAt,
                 null,
+                null,
                 httpStatus,
                 finalFailureReason);
     }
@@ -138,14 +145,44 @@ public class NotificationEvent {
         this.deliveryStatus = DeliveryStatus.DELIVERING;
         this.lastAttemptAt = attemptedAt;
         this.attemptCount++;
+        this.nextRetryAt = null;
     }
 
     public void markCompleted(Instant deliveredAt, int httpStatus) {
         this.deliveryStatus = DeliveryStatus.COMPLETED;
         this.deliveredAt = deliveredAt;
         this.lastAttemptAt = deliveredAt;
+        this.nextRetryAt = null;
         this.httpStatus = httpStatus;
         this.finalFailureReason = null;
+    }
+
+    public void markRetryableFailure(
+            Instant attemptedAt,
+            Integer httpStatus,
+            String finalFailureReason,
+            Instant nextRetryAt) {
+        this.deliveryStatus = DeliveryStatus.FAILED_RETRYABLE;
+        this.lastAttemptAt = attemptedAt;
+        this.httpStatus = httpStatus;
+        this.finalFailureReason = finalFailureReason;
+        this.nextRetryAt = nextRetryAt;
+    }
+
+    public void markFailed(Instant attemptedAt, Integer httpStatus, String finalFailureReason) {
+        this.deliveryStatus = DeliveryStatus.FAILED;
+        this.lastAttemptAt = attemptedAt;
+        this.httpStatus = httpStatus;
+        this.finalFailureReason = finalFailureReason;
+        this.nextRetryAt = null;
+    }
+
+    public boolean hasRetriesRemaining(int maxAttempts) {
+        return attemptCount < maxAttempts;
+    }
+
+    public boolean isReadyForDelivery() {
+        return deliveryStatus == DeliveryStatus.PENDING || deliveryStatus == DeliveryStatus.FAILED_RETRYABLE;
     }
 
     public boolean canReplay() {
@@ -202,5 +239,9 @@ public class NotificationEvent {
 
     public String finalFailureReason() {
         return finalFailureReason;
+    }
+
+    public Instant nextRetryAt() {
+        return nextRetryAt;
     }
 }
