@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: notification-service
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/notification_service}
+    username: ${DB_USERNAME:notification_user}
+    password: ${DB_PASSWORD:notification_password}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+server:
+  port: 8080
+
+notifications:
+  delivery:
+    poll-delay: 5000
+
