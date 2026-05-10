@@ -76,6 +76,36 @@ public class NotificationEvent {
                 null);
     }
 
+    public static NotificationEvent restore(
+            NotificationEventId notificationEventId,
+            SourceEventId sourceEventId,
+            ClientId clientId,
+            EventType eventType,
+            String content,
+            Instant eventCreatedAt,
+            Instant createdAt,
+            DeliveryStatus deliveryStatus,
+            int attemptCount,
+            Instant lastAttemptAt,
+            Instant deliveredAt,
+            Integer httpStatus,
+            String finalFailureReason) {
+        return new NotificationEvent(
+                notificationEventId,
+                sourceEventId,
+                clientId,
+                eventType,
+                content,
+                eventCreatedAt,
+                createdAt,
+                deliveryStatus,
+                attemptCount,
+                lastAttemptAt,
+                deliveredAt,
+                httpStatus,
+                finalFailureReason);
+    }
+
     public static NotificationEvent failed(
             NotificationEventId notificationEventId,
             SourceEventId sourceEventId,
