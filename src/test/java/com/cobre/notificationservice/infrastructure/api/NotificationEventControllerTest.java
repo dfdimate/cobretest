@@ -91,4 +91,30 @@ class NotificationEventControllerTest {
                 .andExpect(jsonPath("$.notification_event_id").value("EVT003"))
                 .andExpect(jsonPath("$.delivery_status").value("PENDING"));
     }
+
+    @Test
+    void shouldReturnNotificationEventDetail() throws Exception {
+        NotificationEvent notificationEvent = NotificationEvent.failed(
+                new NotificationEventId("EVT005"),
+                new SourceEventId("EVT005"),
+                new ClientId("CLIENT003"),
+                new EventType("credit_refund"),
+                "Refund processed for order #789 for $45.99",
+                Instant.parse("2024-03-15T13:45:10Z"),
+                Instant.parse("2024-03-15T13:45:11Z"),
+                Instant.parse("2024-03-15T14:00:00Z"),
+                503,
+                "Webhook endpoint unavailable",
+                4);
+
+        when(demoClientIdentityResolver.resolveClientId(any())).thenReturn(new ClientId("CLIENT003"));
+        when(getNotificationEventDetailUseCase.get(new NotificationEventId("EVT005"), new ClientId("CLIENT003")))
+                .thenReturn(notificationEvent);
+
+        mockMvc.perform(get("/notification_events/EVT005").header("X-Client-Id", "CLIENT003"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.notification_event_id").value("EVT005"))
+                .andExpect(jsonPath("$.attempt_count").value(4))
+                .andExpect(jsonPath("$.failure_reason").value("Webhook endpoint unavailable"));
+    }
 }

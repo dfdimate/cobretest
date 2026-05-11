@@ -4,6 +4,7 @@ import com.cobre.notificationservice.domain.model.SourceEvent;
 import com.cobre.notificationservice.domain.model.value.ClientId;
 import com.cobre.notificationservice.domain.model.value.EventType;
 import com.cobre.notificationservice.domain.model.value.SourceEventId;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
@@ -43,6 +44,7 @@ public class NotificationEventsFileLoader {
     private record NotificationEventsPayload(List<NotificationEventFileRecord> events) {
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private record NotificationEventFileRecord(
             @JsonProperty("event_id") String eventId,
             @JsonProperty("event_type") String eventType,
@@ -51,4 +53,3 @@ public class NotificationEventsFileLoader {
             @JsonProperty("client_id") String clientId) {
     }
 }
-

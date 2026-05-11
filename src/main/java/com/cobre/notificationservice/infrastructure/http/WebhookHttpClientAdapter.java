@@ -31,9 +31,7 @@ public class WebhookHttpClientAdapter implements WebhookDeliveryPort {
             HttpStatusCode statusCode = restClient.post()
                     .uri(targetUri)
                     .body(notificationEvent.content())
-                    .retrieve()
-                    .toBodilessEntity()
-                    .getStatusCode();
+                    .exchange((request, response) -> response.getStatusCode());
 
             if (statusCode.is2xxSuccessful()) {
                 return DeliveryResult.success(statusCode.value());
