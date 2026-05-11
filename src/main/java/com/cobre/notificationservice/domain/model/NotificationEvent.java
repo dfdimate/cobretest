@@ -189,6 +189,13 @@ public class NotificationEvent {
         return deliveryStatus == DeliveryStatus.FAILED;
     }
 
+    public void requeue() {
+        this.deliveryStatus = DeliveryStatus.PENDING;
+        this.nextRetryAt = null;
+        this.finalFailureReason = null;
+        this.httpStatus = null;
+    }
+
     public NotificationEventId notificationEventId() {
         return notificationEventId;
     }
