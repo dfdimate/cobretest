@@ -8,20 +8,43 @@ Spring Boot project for asynchronous webhook delivery and a self-service notific
 flowchart LR
     A["notification_events.json"] --> B["Startup importer"]
     B --> C["Create notification event"]
-    C --> D[("PostgreSQL")]
+    C --> DB[("PostgreSQL")]
 
-    E["Client REST calls"] --> F["Self-service API"]
-    F --> D
+    subgraph API["Scalable API layer"]
+        LB["Load balancer"] --> API1["Self-service API instance 1"]
+        LB --> API2["Self-service API instance 2..N"]
+    end
 
-    G["Scheduler"] --> H["Retry due notifications"]
-    H --> D
-    H --> I["Webhook delivery adapter"]
-    I --> J["Client webhook endpoint"]
-    I --> K["Structured logs and metrics"]
-    I --> D
+    U["Client REST calls"] --> LB
+    API1 --> DB
+    API2 --> DB
+
+    subgraph WORKERS["Asynchronous delivery workers"]
+        S["Scheduler"] --> R["Find due notifications"]
+        R --> CLAIM["Atomic claim"]
+        CLAIM --> P["Process delivery"]
+        P --> WEB["Webhook delivery adapter"]
+    end
+
+    DB --> R
+    WEB --> ENDPOINT["Client webhook endpoint"]
+    WEB --> OBS["Structured logs and metrics"]
+
+    P --> OK{"2xx response?"}
+    OK -->|Yes| DONE["Mark COMPLETED + delivered_at"]
+    OK -->|No, retryable| RETRY["Mark FAILED_RETRYABLE + nextRetryAt"]
+    OK -->|No, exhausted| FAIL["Mark FAILED + failure reason"]
+
+    DONE --> DB
+    RETRY --> BACKOFF["Exponential backoff"]
+    BACKOFF --> DB
+    FAIL --> DB
+
+    DB --> RECOVERY["Recover stale DELIVERING records"]
+    RECOVERY --> CLAIM
 ```
 
-The service loads source events at startup, persists them as notification delivery records, exposes a self-service API for querying and replaying them, and processes webhook delivery asynchronously with retries backed by PostgreSQL.
+The service loads source events at startup, persists them as notification delivery records, exposes a self-service API for querying and replaying them, and processes webhook delivery asynchronously with retries backed by PostgreSQL. Scalability comes from stateless API instances and decoupled background workers, while resiliency comes from persisted delivery state, atomic claims, exponential backoff, stale-delivery recovery, and near real-time logs and metrics.
 
 ## Local development
 
