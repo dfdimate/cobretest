@@ -10,6 +10,8 @@ Start PostgreSQL:
 docker compose up -d postgres
 ```
 
+Note: Docker Desktop must be running before the compose command can start the PostgreSQL container.
+
 Run the application:
 
 ```bash

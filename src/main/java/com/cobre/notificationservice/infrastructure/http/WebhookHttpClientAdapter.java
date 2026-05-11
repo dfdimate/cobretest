@@ -21,9 +21,15 @@ public class WebhookHttpClientAdapter implements WebhookDeliveryPort {
 
     @Override
     public DeliveryResult deliver(NotificationEvent notificationEvent, Subscription subscription) {
+        URI targetUri = URI.create(subscription.targetUrl());
+
+        if (!isAllowedWebhookUri(targetUri)) {
+            return DeliveryResult.permanentFailure(null, "Webhook URL is not allowed");
+        }
+
         try {
             HttpStatusCode statusCode = restClient.post()
-                    .uri(URI.create(subscription.targetUrl()))
+                    .uri(targetUri)
                     .body(notificationEvent.content())
                     .retrieve()
                     .toBodilessEntity()
@@ -40,5 +46,23 @@ public class WebhookHttpClientAdapter implements WebhookDeliveryPort {
             return DeliveryResult.retryableFailure(null, exception.getMessage());
         }
     }
-}
 
+    private boolean isAllowedWebhookUri(URI uri) {
+        String scheme = uri.getScheme();
+        String host = uri.getHost();
+
+        if (!"https".equalsIgnoreCase(scheme) || host == null || host.isBlank()) {
+            return false;
+        }
+
+        String normalizedHost = host.toLowerCase();
+        if ("localhost".equals(normalizedHost) || "::1".equals(normalizedHost)) {
+            return false;
+        }
+
+        return !normalizedHost.startsWith("127.")
+                && !normalizedHost.startsWith("10.")
+                && !normalizedHost.startsWith("192.168.")
+                && !normalizedHost.matches("^172\\.(1[6-9]|2\\d|3[0-1])\\..*");
+    }
+}

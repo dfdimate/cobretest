@@ -11,6 +11,7 @@ import com.cobre.notificationservice.domain.model.Subscription;
 import com.cobre.notificationservice.domain.model.value.NotificationEventId;
 import java.time.Instant;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 public class ProcessNotificationDeliveryUseCase {
@@ -20,8 +21,8 @@ public class ProcessNotificationDeliveryUseCase {
     private final WebhookDeliveryPort webhookDeliveryPort;
     private final ObservabilityPort observabilityPort;
     private final ClockPort clockPort;
-    private final int maxAttempts = 4;
-    private final long initialBackoffSeconds = 30L;
+    private int maxAttempts = 4;
+    private long initialBackoffSeconds = 30L;
 
     public ProcessNotificationDeliveryUseCase(
             NotificationEventRepositoryPort notificationEventRepository,
@@ -34,6 +35,16 @@ public class ProcessNotificationDeliveryUseCase {
         this.webhookDeliveryPort = webhookDeliveryPort;
         this.observabilityPort = observabilityPort;
         this.clockPort = clockPort;
+    }
+
+    @Value("${notifications.delivery.max-attempts:4}")
+    void setMaxAttempts(int maxAttempts) {
+        this.maxAttempts = maxAttempts;
+    }
+
+    @Value("${notifications.delivery.initial-backoff-seconds:30}")
+    void setInitialBackoffSeconds(long initialBackoffSeconds) {
+        this.initialBackoffSeconds = initialBackoffSeconds;
     }
 
     public void process(NotificationEventId notificationEventId) {
@@ -84,4 +95,3 @@ public class ProcessNotificationDeliveryUseCase {
         return attemptedAt.plusSeconds(initialBackoffSeconds * multiplier);
     }
 }
-

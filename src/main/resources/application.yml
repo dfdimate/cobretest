@@ -18,4 +18,5 @@ server:
 notifications:
   delivery:
     poll-delay: 5000
-
+    max-attempts: 4
+    initial-backoff-seconds: 30
