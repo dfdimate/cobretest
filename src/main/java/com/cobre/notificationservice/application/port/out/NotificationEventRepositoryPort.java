@@ -20,5 +20,11 @@ public interface NotificationEventRepositoryPort {
 
     Optional<NotificationEvent> findById(NotificationEventId notificationEventId);
 
-    List<NotificationEvent> findDueForDelivery(Instant now);
+    List<NotificationEventId> findDueForDelivery(Instant now);
+
+    Optional<NotificationEvent> claimForDelivery(NotificationEventId notificationEventId, Instant claimedAt, Instant now);
+
+    Optional<NotificationEvent> requeueIfFailed(NotificationEventId notificationEventId, Instant requeuedAt);
+
+    List<NotificationEvent> findStaleDeliveries(Instant claimedBefore);
 }

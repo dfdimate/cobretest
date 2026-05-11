@@ -29,9 +29,7 @@ public class ReplayFailedNotificationUseCase {
             throw new ReplayNotAllowedException(notificationEventId.value());
         }
 
-        clockPort.now();
-        notificationEvent.requeue();
-        return notificationEventRepository.save(notificationEvent);
+        return notificationEventRepository.requeueIfFailed(notificationEventId, clockPort.now())
+                .orElseThrow(() -> new ReplayNotAllowedException(notificationEventId.value()));
     }
 }
-

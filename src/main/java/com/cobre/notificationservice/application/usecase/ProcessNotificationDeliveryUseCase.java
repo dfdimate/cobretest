@@ -10,8 +10,8 @@ import com.cobre.notificationservice.domain.model.NotificationEvent;
 import com.cobre.notificationservice.domain.model.Subscription;
 import com.cobre.notificationservice.domain.model.value.NotificationEventId;
 import java.time.Instant;
-import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 @Service
 public class ProcessNotificationDeliveryUseCase {
@@ -48,8 +48,8 @@ public class ProcessNotificationDeliveryUseCase {
     }
 
     public void process(NotificationEventId notificationEventId) {
-        notificationEventRepository.findById(notificationEventId)
-                .filter(NotificationEvent::isReadyForDelivery)
+        Instant claimedAt = clockPort.now();
+        notificationEventRepository.claimForDelivery(notificationEventId, claimedAt, claimedAt)
                 .ifPresent(this::deliver);
     }
 

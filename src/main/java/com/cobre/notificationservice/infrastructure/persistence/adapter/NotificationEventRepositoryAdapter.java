@@ -12,6 +12,8 @@ import com.cobre.notificationservice.infrastructure.persistence.repository.Sprin
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -35,7 +37,12 @@ public class NotificationEventRepositoryAdapter implements NotificationEventRepo
             Instant fromEventCreatedAt,
             Instant toEventCreatedAt,
             DeliveryStatus deliveryStatus) {
-        return repository.findByFilters(clientId.value(), fromEventCreatedAt, toEventCreatedAt, deliveryStatus)
+        Specification<NotificationEventEntity> specification = byClientId(clientId.value())
+                .and(fromEventCreatedAt != null ? eventCreatedAtOnOrAfter(fromEventCreatedAt) : null)
+                .and(toEventCreatedAt != null ? eventCreatedAtOnOrBefore(toEventCreatedAt) : null)
+                .and(deliveryStatus != null ? hasDeliveryStatus(deliveryStatus) : null);
+
+        return repository.findAll(specification, Sort.by(Sort.Direction.DESC, "eventCreatedAt"))
                 .stream()
                 .map(this::toDomain)
                 .toList();
@@ -47,10 +54,60 @@ public class NotificationEventRepositoryAdapter implements NotificationEventRepo
     }
 
     @Override
-    public List<NotificationEvent> findDueForDelivery(Instant now) {
+    public List<NotificationEventId> findDueForDelivery(Instant now) {
         return repository.findDueForDelivery(now).stream()
+                .map(NotificationEventId::new)
+                .toList();
+    }
+
+    @Override
+    public Optional<NotificationEvent> claimForDelivery(
+            NotificationEventId notificationEventId,
+            Instant claimedAt,
+            Instant now) {
+        int updated = repository.claimForDelivery(notificationEventId.value(), claimedAt, now);
+        if (updated == 0) {
+            return Optional.empty();
+        }
+
+        return repository.findById(notificationEventId.value()).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<NotificationEvent> requeueIfFailed(NotificationEventId notificationEventId, Instant requeuedAt) {
+        int updated = repository.requeueIfFailed(notificationEventId.value(), requeuedAt);
+        if (updated == 0) {
+            return Optional.empty();
+        }
+
+        return repository.findById(notificationEventId.value()).map(this::toDomain);
+    }
+
+    @Override
+    public List<NotificationEvent> findStaleDeliveries(Instant claimedBefore) {
+        return repository.findStaleDeliveries(claimedBefore).stream()
                 .map(this::toDomain)
                 .toList();
+    }
+
+    private Specification<NotificationEventEntity> byClientId(String clientId) {
+        return (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("clientId"), clientId);
+    }
+
+    private Specification<NotificationEventEntity> eventCreatedAtOnOrAfter(Instant fromEventCreatedAt) {
+        return (root, query, criteriaBuilder) -> criteriaBuilder.greaterThanOrEqualTo(
+                root.get("eventCreatedAt"),
+                fromEventCreatedAt);
+    }
+
+    private Specification<NotificationEventEntity> eventCreatedAtOnOrBefore(Instant toEventCreatedAt) {
+        return (root, query, criteriaBuilder) -> criteriaBuilder.lessThanOrEqualTo(
+                root.get("eventCreatedAt"),
+                toEventCreatedAt);
+    }
+
+    private Specification<NotificationEventEntity> hasDeliveryStatus(DeliveryStatus deliveryStatus) {
+        return (root, query, criteriaBuilder) -> criteriaBuilder.equal(root.get("deliveryStatus"), deliveryStatus);
     }
 
     private NotificationEventEntity toEntity(NotificationEvent notificationEvent) {
@@ -72,6 +129,10 @@ public class NotificationEventRepositoryAdapter implements NotificationEventRepo
         entity.setUpdatedAt(notificationEvent.lastAttemptAt() != null
                 ? notificationEvent.lastAttemptAt()
                 : notificationEvent.createdAt());
+        entity.setDeliveryClaimedAt(
+                notificationEvent.deliveryStatus() == DeliveryStatus.DELIVERING
+                        ? notificationEvent.lastAttemptAt()
+                        : null);
         return entity;
     }
 

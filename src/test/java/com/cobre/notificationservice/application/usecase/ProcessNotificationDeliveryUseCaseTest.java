@@ -1,5 +1,6 @@
 package com.cobre.notificationservice.application.usecase;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
@@ -49,7 +50,7 @@ class ProcessNotificationDeliveryUseCaseTest {
 
     @Test
     void shouldCompleteNotificationOnAny2xxResponse() {
-        NotificationEvent notificationEvent = NotificationEvent.pending(
+        NotificationEvent claimedNotificationEvent = NotificationEvent.pending(
                 new NotificationEventId("EVT001"),
                 new SourceEventId("EVT001"),
                 new ClientId("CLIENT001"),
@@ -57,14 +58,18 @@ class ProcessNotificationDeliveryUseCaseTest {
                 "Credit card payment received for $150.00",
                 Instant.parse("2024-03-15T09:30:22Z"),
                 Instant.parse("2024-03-15T09:30:23Z"));
+        claimedNotificationEvent.markDelivering(Instant.parse("2024-03-15T10:00:00Z"));
         Subscription subscription = new Subscription(
                 new ClientId("CLIENT001"),
                 new EventType("credit_card_payment"),
                 "https://client001.example.com/webhooks/credit-card-payment",
                 true);
 
-        when(notificationEventRepository.findById(new NotificationEventId("EVT001")))
-                .thenReturn(Optional.of(notificationEvent));
+        when(notificationEventRepository.claimForDelivery(
+                new NotificationEventId("EVT001"),
+                Instant.parse("2024-03-15T10:00:00Z"),
+                Instant.parse("2024-03-15T10:00:00Z")))
+                .thenReturn(Optional.of(claimedNotificationEvent));
         when(subscriptionRepository.findActiveByClientIdAndEventType(
                 new ClientId("CLIENT001"),
                 new EventType("credit_card_payment"))).thenReturn(Optional.of(subscription));
@@ -72,7 +77,7 @@ class ProcessNotificationDeliveryUseCaseTest {
                 .thenReturn(
                         Instant.parse("2024-03-15T10:00:00Z"),
                         Instant.parse("2024-03-15T10:00:02Z"));
-        when(webhookDeliveryPort.deliver(notificationEvent, subscription))
+        when(webhookDeliveryPort.deliver(claimedNotificationEvent, subscription))
                 .thenReturn(DeliveryResult.success(202));
 
         useCase.process(new NotificationEventId("EVT001"));
@@ -84,7 +89,7 @@ class ProcessNotificationDeliveryUseCaseTest {
 
     @Test
     void shouldMarkRetryableFailureAndScheduleNextRetry() {
-        NotificationEvent notificationEvent = NotificationEvent.pending(
+        NotificationEvent claimedNotificationEvent = NotificationEvent.pending(
                 new NotificationEventId("EVT003"),
                 new SourceEventId("EVT003"),
                 new ClientId("CLIENT002"),
@@ -92,14 +97,18 @@ class ProcessNotificationDeliveryUseCaseTest {
                 "Bank transfer received from Account #4567 for $1,500.00",
                 Instant.parse("2024-03-15T11:20:18Z"),
                 Instant.parse("2024-03-15T11:20:19Z"));
+        claimedNotificationEvent.markDelivering(Instant.parse("2024-03-15T11:25:00Z"));
         Subscription subscription = new Subscription(
                 new ClientId("CLIENT002"),
                 new EventType("credit_transfer"),
                 "https://client002.example.com/webhooks/credit-transfer",
                 true);
 
-        when(notificationEventRepository.findById(new NotificationEventId("EVT003")))
-                .thenReturn(Optional.of(notificationEvent));
+        when(notificationEventRepository.claimForDelivery(
+                new NotificationEventId("EVT003"),
+                Instant.parse("2024-03-15T11:25:00Z"),
+                Instant.parse("2024-03-15T11:25:00Z")))
+                .thenReturn(Optional.of(claimedNotificationEvent));
         when(subscriptionRepository.findActiveByClientIdAndEventType(
                 new ClientId("CLIENT002"),
                 new EventType("credit_transfer"))).thenReturn(Optional.of(subscription));
@@ -107,7 +116,7 @@ class ProcessNotificationDeliveryUseCaseTest {
                 .thenReturn(
                         Instant.parse("2024-03-15T11:25:00Z"),
                         Instant.parse("2024-03-15T11:25:01Z"));
-        when(webhookDeliveryPort.deliver(notificationEvent, subscription))
+        when(webhookDeliveryPort.deliver(claimedNotificationEvent, subscription))
                 .thenReturn(DeliveryResult.retryableFailure(503, "endpoint unavailable"));
 
         useCase.process(new NotificationEventId("EVT003"));
@@ -116,5 +125,16 @@ class ProcessNotificationDeliveryUseCaseTest {
                 event.deliveryStatus() == DeliveryStatus.FAILED_RETRYABLE
                         && event.httpStatus() == 503
                         && event.nextRetryAt() != null));
+    }
+
+    @Test
+    void shouldSkipDeliveryWhenAtomicClaimFails() {
+        when(clockPort.now()).thenReturn(Instant.parse("2024-03-15T11:25:00Z"));
+        when(notificationEventRepository.claimForDelivery(any(), any(), any())).thenReturn(Optional.empty());
+
+        useCase.process(new NotificationEventId("EVT404"));
+
+        verify(webhookDeliveryPort, org.mockito.Mockito.never()).deliver(any(), any());
+        verify(notificationEventRepository, org.mockito.Mockito.never()).save(any());
     }
 }

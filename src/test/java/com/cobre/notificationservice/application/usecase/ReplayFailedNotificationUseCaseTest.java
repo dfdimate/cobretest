@@ -67,12 +67,51 @@ class ReplayFailedNotificationUseCaseTest {
 
         when(notificationEventRepository.findById(new NotificationEventId("EVT003")))
                 .thenReturn(Optional.of(notificationEvent));
+        NotificationEvent replayedNotificationEvent = NotificationEvent.pending(
+                new NotificationEventId("EVT003"),
+                new SourceEventId("EVT003"),
+                new ClientId("CLIENT002"),
+                new EventType("credit_transfer"),
+                "Bank transfer received from Account #4567 for $1,500.00",
+                Instant.parse("2024-03-15T11:20:18Z"),
+                Instant.parse("2024-03-15T11:20:19Z"));
         when(clockPort.now()).thenReturn(Instant.parse("2024-03-15T12:00:00Z"));
+        when(notificationEventRepository.requeueIfFailed(
+                new NotificationEventId("EVT003"),
+                Instant.parse("2024-03-15T12:00:00Z")))
+                .thenReturn(Optional.of(replayedNotificationEvent));
 
         useCase.replay(new NotificationEventId("EVT003"), new ClientId("CLIENT002"));
 
-        verify(notificationEventRepository).save(argThat(event ->
-                event.deliveryStatus().name().equals("PENDING")
-                        && event.notificationEventId().value().equals("EVT003")));
+        verify(notificationEventRepository).requeueIfFailed(
+                new NotificationEventId("EVT003"),
+                Instant.parse("2024-03-15T12:00:00Z"));
+    }
+
+    @Test
+    void shouldRejectReplayWhenAtomicRequeueFails() {
+        NotificationEvent notificationEvent = NotificationEvent.failed(
+                new NotificationEventId("EVT003"),
+                new SourceEventId("EVT003"),
+                new ClientId("CLIENT002"),
+                new EventType("credit_transfer"),
+                "Bank transfer received from Account #4567 for $1,500.00",
+                Instant.parse("2024-03-15T11:20:18Z"),
+                Instant.parse("2024-03-15T11:20:19Z"),
+                Instant.parse("2024-03-15T11:45:00Z"),
+                503,
+                "Webhook endpoint unavailable",
+                4);
+
+        when(notificationEventRepository.findById(new NotificationEventId("EVT003")))
+                .thenReturn(Optional.of(notificationEvent));
+        when(clockPort.now()).thenReturn(Instant.parse("2024-03-15T12:00:00Z"));
+        when(notificationEventRepository.requeueIfFailed(
+                new NotificationEventId("EVT003"),
+                Instant.parse("2024-03-15T12:00:00Z")))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> useCase.replay(new NotificationEventId("EVT003"), new ClientId("CLIENT002")))
+                .isInstanceOf(ReplayNotAllowedException.class);
     }
 }

@@ -20,3 +20,4 @@ notifications:
     poll-delay: 5000
     max-attempts: 4
     initial-backoff-seconds: 30
+    stale-claim-timeout-seconds: 300
